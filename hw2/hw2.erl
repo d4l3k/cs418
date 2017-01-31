@@ -4,6 +4,7 @@
 -export([bank_statement/4, sample_transactions/0]).
 -export([sliding_average/5]).
 -export([sliding_average_help/3, sliding_average_seq/3, avg_demo/0]).
+-export([compact_transactions/1, process_transaction/2]).
 
 -import(hw1, [closest/2]).
 
@@ -23,11 +24,20 @@
 %       Mean = hw2:mean(W, data).
 %   The last command should set Mean to 500.0
 mean(WTree, DataKey) ->
-  wtree:reduce(WTree,
-               fun(State) ->
-                   Nums = wtree:get(State, DataKey),
-                  lists:sum(Nums) / length(Nums) end,
-               fun(Left, Right) -> (Left+Right)/2 end).
+  {N, S} = wtree:reduce(WTree,
+                        fun(ProcState) ->
+                            Nums = wtree:get(ProcState, DataKey),
+                            {length(Nums), lists:sum(Nums)}
+                        end,
+                        fun(Left, Right) ->
+                            {LN, LS} = Left,
+                            {RN, RS} = Right,
+                            {LN+RN, LS+RS}
+                        end),
+  if
+    N == 0 -> error(empty);
+    true -> S/N
+  end.
 
 
 
@@ -48,7 +58,22 @@ mean(WTree, DataKey) ->
 %       workers:update(W, vdata, misc:cut(VList, W)).
 %       VMean = hw2:vec_mean(W, vdata).
 %   The last command should set VMean to [501.0, 502.0, 503.0]
-vec_mean(_WTree, _DataKey) -> 0.0.  % this is a stub
+vec_mean(WTree, DataKey) ->
+  {N, S} = wtree:reduce(WTree,
+                        fun(ProcState) ->
+                            Nums = wtree:get(ProcState, DataKey),
+                            {length(Nums), vec_sum(Nums)}
+                        end,
+                        fun(Left, Right) ->
+                            {LN, LS} = Left,
+                            {RN, RS} = Right,
+                            {LN+RN, vec_add(LS,RS)}
+                        end),
+  if
+    N == 0 -> error(empty);
+    true -> [X / N || X <- S]
+  end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % I'm providing vec_add and vec_sum   %
@@ -87,7 +112,10 @@ vec_sum(VList) -> lists:foldl(fun(E, Acc) -> vec_add(Acc, E) end, 0, VList).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % set_nth(N, Fun, List) -> replace the Nth element of List with Fun(lists:nth(List))
-set_nth(_N, _Fun, _List) -> [].  % this is a stub.
+set_nth(N, Fun, List)
+  when is_number(N), is_function(Fun), is_list(List), N =< length(List), N > 0
+       -> lists:sublist(List, N-1) ++
+          [Fun(lists:nth(N, List)) | lists:sublist(List, N+1, length(List))].
 
 
 
@@ -97,13 +125,62 @@ set_nth(_N, _Fun, _List) -> [].  % this is a stub.
 %                                                                          %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+compact_transactions([]) -> [];
+compact_transactions([ H1 | T]) ->
+  {A1, N1} = H1,
+  if
+    A1 == withdraw ->
+      compact_transactions([{deposit, -N1} | T]);
+    length(T) >= 1 ->
+      {A2, N2} = hd(T),
+      if
+        A1 == deposit andalso A2 == deposit ->
+          compact_transactions([{deposit, N1 + N2} | tl(T)]);
+        A1 == interest andalso A2 == interest ->
+          compact_transactions([{interest, ((1 + N1/100)*(1 + N2/100)-1)*100} | tl(T)]);
+        true ->
+          [H1 | compact_transactions(T)]
+      end;
+    true -> [H1 | compact_transactions(T)]
+  end.
+
+process_transaction({withdraw, N}, Acc) ->
+  Acc - N;
+process_transaction({deposit, N}, Acc) ->
+  Acc + N;
+process_transaction({interest, N}, Acc) ->
+  Acc*(1+(N/100)).
+
+process_transactions([], Acc) -> Acc;
+process_transactions([H | T], Acc) ->
+  process_transactions(T, process_transaction(H, Acc)).
+
+process_transactions_cum([], _Acc) -> [];
+process_transactions_cum([H | T], Acc) ->
+  Acc = process_transaction(H, Acc),
+  [Acc | process_transactions_cum(T, Acc)].
+
+
 % bank_statement(WTree, SrcKey, DstKey, InitialBalance)
 %   Compute a bank statement for an account starting with a balance of InitialBalance.
 %   WTree is a worker-tree.  The list of transactions to be performed for the statement
 %     are stored in a list distributed across the workers.
 %   SrcKey is the name of the list of transactions.
 %   DstKey is the name under which to save the list of after-transaction balances.
-bank_statement(_WTree, _SrcKey, _DstKey, _InitialBalance) -> ok.  % this is a stub
+bank_statement(W, SrcKey, DstKey, InitialBalance) ->
+  Leaf1 = fun(ProcState) ->
+    T = compact_transactions(wtree:get(ProcState, SrcKey)),
+    {T, process_transactions(T, 0)}
+  end,
+  Leaf2 = fun(ProcState, AccIn) ->
+    {_T, N} = AccIn,
+    Src = wtree:get(ProcState, SrcKey),  % get the original list
+    Result = process_transactions_cum(Src, N),    % compute the cummulative sum
+    wtree:put(ProcState, DstKey, Result) % save the result -- must be the last expression
+  end,                                   %   in the Leaf2 function
+  Combine = fun({T1, N1}, {T2, _N2}) -> {compact_transactions(T1 ++ T2),
+                                        process_transactions(T2, N1)} end,
+  wtree:scan(W, Leaf1, Leaf2, Combine, {[], InitialBalance}).
 
 % sample_transactions provides the transaction list for the example from
 %   the problem statement.
@@ -141,7 +218,25 @@ sample_transactions() ->  [ % a list of 21 transactions for testing bank_stateme
 %                                                                          %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-sliding_average(_WTree, _SrcKey, _DstKey, _Kernel, _InitialPrefix) -> ok. % this is a stub
+last_two(Data) ->
+  DLen = length(Data),
+  if
+    DLen >= 2 -> lists:sublist(Data,DLen-1,2);
+    true -> Data
+  end.
+
+sliding_average(WTree, SrcKey, DstKey, Kernel, InitialPrefix) ->
+  Leaf1 = fun(ProcState) ->
+    last_two(wtree:get(ProcState, SrcKey))
+  end,
+  Leaf2 = fun(ProcState, AccIn) ->
+    Src = wtree:get(ProcState, SrcKey),
+    %Result = sliding_average(AccIn++Src, Kernel),
+    Result = sliding_average_seq(Src, Kernel, AccIn),
+    wtree:put(ProcState, DstKey, Result)
+  end,
+  Combine = fun(Left, Right) -> last_two(Left++Right) end,
+  wtree:scan(WTree, Leaf1, Leaf2, Combine, InitialPrefix).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % The next three functions: dp, sliding_average_help, and        %

@@ -2,7 +2,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--import(hw2, [mean/2, vec_mean/2, set_nth/3, bank_statement/4, sliding_average/5]).
+-import(hw2, [mean/2, vec_mean/2, set_nth/3, bank_statement/4,
+              sliding_average/5, compact_transactions/1, process_transaction/2]).
 -export([vec_close/2, sliding_average_expected/4, sliding_average_run/5]).
 
 -define(errTol, 1.0e-12).  % round-off error tolerance for floating point results
@@ -101,6 +102,7 @@ vec_mean_init() ->
   % The example from the template file.
   VList = [vec_add(N, [1,2,3]) || N <- lists:seq(0,1000)],
   workers:update(W, vdata, misc:cut(VList, W)),
+  workers:update(W, vempty, misc:cut([[],[],[]], W)),
 
   % You should add more test cases.  The examples from mean_init() and
   % mean_test_cases() should provide "inspiration".
@@ -139,7 +141,7 @@ vec_close(V1, V2) ->
 	       || {X1, X2} <- lists:zip(V1, V2)
 	     ]
       end;
-    false -> mismatched_vector_lengths
+    false -> {mismatched_vector_lengths, V1, V2}
   end.
 
 vec_mean_test_cases(W) ->
@@ -170,7 +172,12 @@ set_nth_test_() ->
   L = [1,4,9,16],
   F = fun(X) -> X*X + 2 end,
   [ ?_assertEqual([1,4,83,16], set_nth(3, F, L)),
-    ?_assertError(_, set_nth(5, F, L))
+    ?_assertEqual([1,4,9,258], set_nth(4, F, L)),
+    ?_assertEqual([3,4,9,16], set_nth(1, F, L)),
+    ?_assertError(_, set_nth(5, F, L)),
+    ?_assertError(_, set_nth(0, F, L)),
+    ?_assertError(_, set_nth(1, F, 5)),
+    ?_assertError(_, set_nth(1, 5, L))
     % you should add more tests here
   ].
 
@@ -180,6 +187,23 @@ set_nth_test_() ->
 %  Q4: bank_statement(WTree, SrcKey, DstKey, InitialBalance)set_nth(N, Fun, List) %
 %                                                                                 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+compact_transactions_test_() ->
+  [ ?_assertEqual([], compact_transactions([])),
+    ?_assertEqual([{deposit, 5}], compact_transactions([{withdraw, -5}])),
+    ?_assertEqual([{deposit, 11}],
+                  compact_transactions([{withdraw, -5}, {deposit, 6}])),
+    ?_assertEqual([{interest, 125.0}],
+                  compact_transactions([{interest, 50}, {interest, 50}])),
+    ?_assertEqual([{interest, 50}, {deposit, 5}, {interest, 50}, {deposit, 10}],
+                  compact_transactions([{interest, 50}, {withdraw, -5},
+                                        {interest, 50}, {deposit, 10}]))
+  ].
+process_transaction_test_() ->
+  [ ?_assertEqual(10, process_transaction({deposit, 6}, 4)),
+    ?_assertEqual(10, process_transaction({withdraw, -6}, 4)),
+    ?_assertEqual(15.0, process_transaction({interest, 50}, 10))
+  ].
 
 bank_statement_init() ->
   W = wtree:create(8),
@@ -206,7 +230,9 @@ bank_statement_init() ->
     {withdraw,  14.00},
     {deposit,  100.00}
   ],
+  %workers:update(W, transactions, misc:cut(Transactions, W)),
   workers:update(W, transactions, misc:cut(Transactions, W)),
+  workers:update(W, emptylist, misc:cut([], W)),
   W.
 
 bank_statement_run(W, SrcKey, DstKey, InitialBalance) ->
@@ -214,7 +240,12 @@ bank_statement_run(W, SrcKey, DstKey, InitialBalance) ->
   lists:append(workers:retrieve(W, DstKey)).
 
 bank_statement_test_cases(W) ->
-  [ ?_assert(vec_close(
+  [
+   ?_assert(vec_close(
+      [],
+      bank_statement_run(W, emptylist, statement, 100.0)
+    )),
+   ?_assert(vec_close(
       [ 200.00, 700.00, 650.0, 625.0, 611.0, 600.0, 630.0, 613.0, 655.0,
         635.35, 511.90, 531.85, 544.242105, 543.912105, 351.232105,
         51.232105, 61.478526, 71.478526, 67.9045997, 53.9045997, 153.9045997
@@ -223,7 +254,7 @@ bank_statement_test_cases(W) ->
     ))
     % You should add more test cases here
   ].
-  
+
 bank_statement_test_() ->
   {setup, fun() -> bank_statement_init() end,         % set up
           fun(W) -> wtree:reap(W) end,                % clean up
@@ -243,15 +274,23 @@ sliding_average_init() ->
   % The example from the template file.
   Data = [ I rem 5 || I <- lists:seq(1, 57) ],
   workers:update(W, data, misc:cut(Data, W)),
+  workers:update(W, emptylist, misc:cut([], W)),
+  workers:update(W, shortlist, misc:cut(lists:seq(1, (2*length(W)) div 3), W)),
   W.
 
 sliding_average_test_cases(W) ->
   Kernel1 = [0.125, 0.25, 0.625],
   InitialPrefix1 = [0, -20],
-  [ ?_assert(vec_close(
+  [
+    ?_assert(vec_close(
+      sliding_average_expected(W, emptylist, Kernel1, InitialPrefix1),
+      sliding_average_run(W, emptylist, data_slide, Kernel1, InitialPrefix1))),
+    ?_assert(vec_close(
       sliding_average_expected(W, data, Kernel1, InitialPrefix1),
-      sliding_average_run(W, data, data_slide, Kernel1, InitialPrefix1)))
-    % You should add more test cases here
+      sliding_average_run(W, data, data_slide, Kernel1, InitialPrefix1))),
+    ?_assert(vec_close(
+      sliding_average_expected(W, shortlist, Kernel1, InitialPrefix1),
+      sliding_average_run(W, shortlist, data_slide, Kernel1, InitialPrefix1)))
   ].
 
 sliding_average_test_() ->
