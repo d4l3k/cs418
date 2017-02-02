@@ -4,8 +4,7 @@
 -export([bank_statement/4, sample_transactions/0]).
 -export([sliding_average/5]).
 -export([sliding_average_help/3, sliding_average_seq/3, avg_demo/0]).
--export([compact_transactions/1, process_transaction/2, process_transactions/2,
-        process_transactions_cum/2]).
+-export([process_transaction/2, process_transactions/2, process_transactions_cum/2]).
 
 -import(hw1, [closest/2]).
 
@@ -126,24 +125,24 @@ set_nth(N, Fun, List)
 %                                                                          %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-compact_transactions([]) -> [];
-compact_transactions([ H1 | T]) ->
-  {A1, N1} = H1,
-  if
-    A1 == withdraw ->
-      compact_transactions([{deposit, -N1} | T]);
-    length(T) >= 1 ->
-      {A2, N2} = hd(T),
-      if
-        A1 == deposit andalso A2 == deposit ->
-          compact_transactions([{deposit, N1 + N2} | tl(T)]);
-        A1 == interest andalso A2 == interest ->
-          compact_transactions([{interest, ((1 + N1/100)*(1 + N2/100)-1)*100} | tl(T)]);
-        true ->
-          [H1 | compact_transactions(T)]
-      end;
-    true -> [H1 | compact_transactions(T)]
-  end.
+%compact_transactions([]) -> [];
+%compact_transactions([ H1 | T]) ->
+%  {A1, N1} = H1,
+%  if
+%    A1 == withdraw ->
+%      compact_transactions([{deposit, -N1} | T]);
+%    length(T) >= 1 ->
+%      {A2, N2} = hd(T),
+%      if
+%        A1 == deposit andalso A2 == deposit ->
+%          compact_transactions([{deposit, N1 + N2} | tl(T)]);
+%        A1 == interest andalso A2 == interest ->
+%          compact_transactions([{interest, ((1 + N1/100)*(1 + N2/100)-1)*100} | tl(T)]);
+%        true ->
+%          [H1 | compact_transactions(T)]
+%      end;
+%    true -> [H1 | compact_transactions(T)]
+%  end.
 
 process_transaction({withdraw, N}, Acc) ->
   Acc - N;
@@ -152,14 +151,25 @@ process_transaction({deposit, N}, Acc) ->
 process_transaction({interest, N}, Acc) ->
   Acc*(1+(N/100)).
 
-process_transactions([], Acc) -> Acc;
-process_transactions([H | T], Acc) ->
-  process_transactions(T, process_transaction(H, Acc)).
+%process_transactions([], Acc) -> Acc;
+%process_transactions([H | T], Acc) ->
+%  process_transactions(T, process_transaction(H, Acc)).
 
 process_transactions_cum([], _Acc) -> [];
 process_transactions_cum([H | T], Acc) ->
   Acc2 = process_transaction(H, Acc),
   [Acc2 | process_transactions_cum(T, Acc2)].
+
+process_transactions([], Acc) -> Acc;
+process_transactions([ H | T ], {Left, Right}) ->
+  {Op, N} = H,
+  if
+    Op == withdraw -> process_transactions(T, {Left, Right - N});
+    Op == deposit -> process_transactions(T, {Left, Right + N});
+    Op == interest ->
+      Multiplier = 1+(N/100),
+      process_transactions(T, {Left*Multiplier, Right*Multiplier})
+  end.
 
 
 % bank_statement(WTree, SrcKey, DstKey, InitialBalance)
@@ -170,18 +180,16 @@ process_transactions_cum([H | T], Acc) ->
 %   DstKey is the name under which to save the list of after-transaction balances.
 bank_statement(W, SrcKey, DstKey, InitialBalance) ->
   Leaf1 = fun(ProcState) ->
-    T = compact_transactions(wtree:get(ProcState, SrcKey)),
-    {T, process_transactions(T, 0)}
+    process_transactions(wtree:get(ProcState, SrcKey), {1, 0})
   end,
   Leaf2 = fun(ProcState, AccIn) ->
-    {_T, N} = AccIn,
-    Src = wtree:get(ProcState, SrcKey),  % get the original list
-    Result = process_transactions_cum(Src, N),    % compute the cummulative sum
+    {_S, C} = AccIn,
+    Src = wtree:get(ProcState, SrcKey),
+    Result = process_transactions_cum(Src, C),    % compute the cummulative sum
     wtree:put(ProcState, DstKey, Result) % save the result -- must be the last expression
   end,                                   %   in the Leaf2 function
-  Combine = fun({T1, N1}, {T2, _N2}) -> {compact_transactions(T1 ++ T2),
-                                        process_transactions(T2, N1)} end,
-  wtree:scan(W, Leaf1, Leaf2, Combine, {[], InitialBalance}).
+  Combine = fun({C1, S1}, {C2, S2}) -> {C1*C2, S1*C2 + S2} end,
+  wtree:scan(W, Leaf1, Leaf2, Combine, {1, InitialBalance}).
 
 % sample_transactions provides the transaction list for the example from
 %   the problem statement.

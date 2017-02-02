@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -import(hw2, [mean/2, vec_mean/2, set_nth/3, bank_statement/4,
-              sliding_average/5, compact_transactions/1, process_transaction/2,
+              sliding_average/5, process_transaction/2,
              process_transactions/2, process_transactions_cum/2]).
 -export([vec_close/2, sliding_average_expected/4, sliding_average_run/5]).
 
@@ -189,17 +189,18 @@ set_nth_test_() ->
 %                                                                                 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-compact_transactions_test_() ->
-  [ ?_assertEqual([], compact_transactions([])),
-    ?_assertEqual([{deposit, 5}], compact_transactions([{withdraw, -5}])),
-    ?_assertEqual([{deposit, 11}],
-                  compact_transactions([{withdraw, -5}, {deposit, 6}])),
-    ?_assertEqual([{interest, 125.0}],
-                  compact_transactions([{interest, 50}, {interest, 50}])),
-    ?_assertEqual([{interest, 50}, {deposit, 5}, {interest, 50}, {deposit, 10}],
-                  compact_transactions([{interest, 50}, {withdraw, -5},
-                                        {interest, 50}, {deposit, 10}]))
-  ].
+%compact_transactions_test_() ->
+%  [ ?_assertEqual([], compact_transactions([])),
+%    ?_assertEqual([{deposit, 5}], compact_transactions([{withdraw, -5}])),
+%    ?_assertEqual([{deposit, 11}],
+%                  compact_transactions([{withdraw, -5}, {deposit, 6}])),
+%    ?_assertEqual([{interest, 125.0}],
+%                  compact_transactions([{interest, 50}, {interest, 50}])),
+%    ?_assertEqual([{interest, 50}, {deposit, 5}, {interest, 50}, {deposit, 10}],
+%                  compact_transactions([{interest, 50}, {withdraw, -5},
+%                                        {interest, 50}, {deposit, 10}]))
+%  ].
+
 process_transaction_test_() ->
   [ ?_assertEqual(10, process_transaction({deposit, 6}, 4)),
     ?_assertEqual(10, process_transaction({withdraw, -6}, 4)),
@@ -208,7 +209,7 @@ process_transaction_test_() ->
 
 process_transactions_test_() ->
   [
-   ?_assertEqual(11.0, process_transactions([{deposit, 6}, {interest, 10}], 4)),
+%   ?_assertEqual(11.0, process_transactions([{deposit, 6}, {interest, 10}], 4)),
    ?_assertEqual([10, 11.0], process_transactions_cum([{deposit, 6}, {interest, 10}], 4))
   ].
 
