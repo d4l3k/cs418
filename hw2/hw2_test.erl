@@ -3,7 +3,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -import(hw2, [mean/2, vec_mean/2, set_nth/3, bank_statement/4,
-              sliding_average/5, compact_transactions/1, process_transaction/2]).
+              sliding_average/5, compact_transactions/1, process_transaction/2,
+             process_transactions/2, process_transactions_cum/2]).
 -export([vec_close/2, sliding_average_expected/4, sliding_average_run/5]).
 
 -define(errTol, 1.0e-12).  % round-off error tolerance for floating point results
@@ -205,6 +206,12 @@ process_transaction_test_() ->
     ?_assertEqual(15.0, process_transaction({interest, 50}, 10))
   ].
 
+process_transactions_test_() ->
+  [
+   ?_assertEqual(11.0, process_transactions([{deposit, 6}, {interest, 10}], 4)),
+   ?_assertEqual([10, 11.0], process_transactions_cum([{deposit, 6}, {interest, 10}], 4))
+  ].
+
 bank_statement_init() ->
   W = wtree:create(8),
   Transactions = [ % example from the hw2.erl template
@@ -232,6 +239,8 @@ bank_statement_init() ->
   ],
   %workers:update(W, transactions, misc:cut(Transactions, W)),
   workers:update(W, transactions, misc:cut(Transactions, W)),
+  workers:update(W, shortlist, misc:cut([{deposit, 10}, {interest, 10},
+                                         {withdraw, 10}], W)),
   workers:update(W, emptylist, misc:cut([], W)),
   W.
 
@@ -244,6 +253,10 @@ bank_statement_test_cases(W) ->
    ?_assert(vec_close(
       [],
       bank_statement_run(W, emptylist, statement, 100.0)
+    )),
+   ?_assert(vec_close(
+      [10.0, 11.0, 1.0],
+      bank_statement_run(W, shortlist, statement, 0.0)
     )),
    ?_assert(vec_close(
       [ 200.00, 700.00, 650.0, 625.0, 611.0, 600.0, 630.0, 613.0, 655.0,

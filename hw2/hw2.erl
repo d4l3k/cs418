@@ -4,7 +4,8 @@
 -export([bank_statement/4, sample_transactions/0]).
 -export([sliding_average/5]).
 -export([sliding_average_help/3, sliding_average_seq/3, avg_demo/0]).
--export([compact_transactions/1, process_transaction/2]).
+-export([compact_transactions/1, process_transaction/2, process_transactions/2,
+        process_transactions_cum/2]).
 
 -import(hw1, [closest/2]).
 
@@ -157,8 +158,8 @@ process_transactions([H | T], Acc) ->
 
 process_transactions_cum([], _Acc) -> [];
 process_transactions_cum([H | T], Acc) ->
-  Acc = process_transaction(H, Acc),
-  [Acc | process_transactions_cum(T, Acc)].
+  Acc2 = process_transaction(H, Acc),
+  [Acc2 | process_transactions_cum(T, Acc2)].
 
 
 % bank_statement(WTree, SrcKey, DstKey, InitialBalance)
