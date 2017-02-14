@@ -4,7 +4,16 @@
 -export([primes/3, sum_inv_twin_primes/2]).
 
 % export some functions that I found handy to access while developing my solution.
--export([primes/1, primes/2, sum_inv_twin_primes/1, twin_primes/1]).
+-export([primes/1, primes/2, sum_inv_twin_primes/1, twin_primes/1, bench/1]).
+
+bench(F) ->
+  bench(F, [4,8,16,32,64,128,256]).
+
+bench(_F, []) -> [];
+bench(F, [H|T]) ->
+  W = wtree:create(H),
+  [ {H, time_it:t(fun() -> F(W) end, 10)} | bench(F, T)].
+
 
 % primes(W, N, DstKey) -> ok
 %   Use the workers of W to compute the primes in [2,N] and store them
@@ -13,7 +22,11 @@
 primes(W, N, DstKey) ->
   % Here's a sequential version.
   % You need to replace the body of this function with a parallel version.
-  workers:update(W, DstKey, misc:cut(primes(N), W)).
+  workers:update(W, DstKey, fun(_ProcState, Arg) ->
+    {Lo, Hi} = Arg,
+    primes(Lo, Hi)
+  end,
+  misc:intervals(2, N, length(W))).
 
 
 % sum_inv_twin_primes(W, SrcKey) -> Sum
