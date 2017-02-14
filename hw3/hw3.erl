@@ -34,9 +34,31 @@ primes(W, N, DstKey) ->
 %   distributed list for the workers of W.  SrcKey is the key associated
 %   with this list of twin primes.
 sum_inv_twin_primes(W, SrcKey) ->
+  DstKey = brun_guess,
+  wtree:scan(W,
+	     fun(ProcState) -> % Leaf1
+		 Primes = wtree:get(ProcState, SrcKey),
+		 if
+		   length(Primes) == 0 -> [];
+		   true -> [lists:last(Primes)]
+		 end
+	     end,
+	     fun(ProcState, AccIn) -> % Leaf2
+		 Primes = wtree:get(ProcState, SrcKey),
+		 Twins = twin_primes(AccIn ++ Primes),
+		 SumInv = lists:sum([1/TP || TP <- Twins]),
+		 wtree:put(ProcState, DstKey, SumInv)
+	     end,
+	     fun(_Left, Right) -> % Combine
+		 Right
+	     end,
+	     []),
+  lists:sum(workers:retrieve(W, DstKey)).
+
+
   % Here's a sequential version.
   % You need to replace the body of this function with a parallel version.
-  lists:sum([1/X || X <- twin_primes(lists:append(workers:retrieve(W, SrcKey)))]).
+  %lists:sum([1/X || X <- twin_primes(lists:append(workers:retrieve(W, SrcKey)))]).
 
 sum_inv_twin_primes(N) when is_integer(N), 0 =< N ->
   lists:sum([1/TP || TP <- twin_primes(N)]).
