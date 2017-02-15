@@ -12,7 +12,7 @@ bench(F) ->
 bench(_F, []) -> [];
 bench(F, [H|T]) ->
   W = wtree:create(H),
-  [ {H, time_it:t(fun() -> F(W) end, 10)} | bench(F, T)].
+  [ {H, time_it:t(fun() -> F(W), wtree:barrier(W) end, 10)} | bench(F, T)].
 
 
 % primes(W, N, DstKey) -> ok
