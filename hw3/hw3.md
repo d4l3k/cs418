@@ -6,17 +6,27 @@ Tristan Rice, q7w9a, 25886145
 
 ## (b) Measure the speedup...
 
+Sequential:
+```erl
+9> time_it:t(fun() -> hw3:primes(1000000) end, 10).
+[{mean,0.6915273465},{std,0.02324092802214097}]
 ```
-5> hw3:bench(fun(W) -> hw3:primes(W, 1000000, primes) end).
-[{4,   [{mean,5.66674e-5},           {std,1.4286761956067352e-4}]},
- {8,   [{mean,1.1832250000000002e-4},{std,3.248553866566373e-4}]},
- {16,  [{mean,1.9971260000000002e-4},{std,5.250574799516293e-4}]},
- {32,  [{mean,0.0014165895},         {std,0.00308463320227231}]},
- {64,  [{mean,0.0027716255000000004},{std,0.004029782263311154}]},
- {128, [{mean,0.027872006300000002}, {std,0.025805217032938886}]},
- {256, [{mean,0.0236185537},         {std,0.012763289731709484}]}]
 
+Parallel:
+```erl
+4> hw3:bench(fun(W) -> hw3:primes(W, 1000000, primes) end).
+[{4,[{mean,0.2155105605},{std,0.027648849586389867}]},
+ {8,[{mean,0.1467121877},{std,0.020825639597937356}]},
+ {16,[{mean,0.0979616279},{std,0.003727850728028083}]},
+ {32,[{mean,0.07133679429999999},{std,0.009338938858238176}]},
+ {64,[{mean,0.04987700180000001},{std,0.013670005283548841}]},
+ {128,[{mean,0.030091090400000003},{std,0.003495737656517365}]},
+ {256,[{mean,0.030351726300000003},{std,0.001120994325492375}]}]
 ```
+It seems like there's about a 23 times speedup with 128 processes. Given that
+there's about 32 cores (64 virtual processors), that makes a fair amount of
+sense with some small amount of overhead.
+
 # Question 2
 
 ## (b) (4 points) Report the elapsed time for

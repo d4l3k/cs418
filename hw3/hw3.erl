@@ -4,7 +4,8 @@
 -export([primes/3, sum_inv_twin_primes/2]).
 
 % export some functions that I found handy to access while developing my solution.
--export([primes/1, primes/2, sum_inv_twin_primes/1, twin_primes/1, bench/1]).
+-export([primes/1, primes/2, sum_inv_twin_primes/1, twin_primes/1, bench/1,
+	 bench_n/1]).
 
 bench(F) ->
   bench(F, [4,8,16,32,64,128,256]).
@@ -12,7 +13,19 @@ bench(F) ->
 bench(_F, []) -> [];
 bench(F, [H|T]) ->
   W = wtree:create(H),
-  [ {H, time_it:t(fun() -> F(W), wtree:barrier(W) end, 10)} | bench(F, T)].
+  Time = time_it:t(fun() -> F(W), wtree:barrier(W) end, 10),
+  wtree:reap(W),
+  [ {H, Time} | bench(F, T)].
+
+bench_n(F) ->
+  bench_n(F, [10,100,1000,10000,100000,1000000]).
+
+bench_n(_F, []) -> [];
+bench_n(F, [H|T]) ->
+  W = wtree:create(128),
+  Time = time_it:t(fun() -> F(W, H), wtree:barrier(W) end, 10),
+  wtree:reap(W),
+  [ {H, Time} | bench_n(F, T)].
 
 
 % primes(W, N, DstKey) -> ok
