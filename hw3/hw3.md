@@ -27,6 +27,58 @@ It seems like there's about a 23 times speedup with 128 processes. Given that
 there's about 32 cores (64 virtual processors), that makes a fair amount of
 sense with some small amount of overhead.
 
+## (c)
+
+```erl
+5> hw3:bench_n(fun(W, N) -> hw3:primes(W, N, primes) end).
+[{10,[{mean,0.0010798956999999998},{std,8.645389528482865e-4}]},
+ {100,[{mean,7.235081e-4},{std,3.771179012649232e-5}]},
+ {1000,[{mean,6.389056e-4},{std,5.747343394841069e-5}]},
+ {10000,[{mean,0.0014029079000000002},{std,7.326087694965982e-5}]},
+ {100000,[{mean,0.005242039700000001},{std,0.0020864608337619645}]},
+ {1000000,[{mean,0.029594235400000002},{std,0.006488786981967219}]}]
+```
+
+## (e) (5 points) Measure the speed up of your implementation of sum_int_twin_primes
+
+Note: these benchmarks also include the time taken to generate the prime numbers.
+
+Sequential
+```erl
+4> time_it:t(fun() -> hw3:sum_inv_twin_primes(1000000) end, 10).
+[{mean,0.6929405766},{std,0.026442211991545932}]
+```
+
+Parallel
+```erl
+5> hw3:bench(fun(W) -> hw3:primes(W, 1000000, primes), hw3:sum_inv_twin_primes(W, primes) end).
+[{4,[{mean,0.25865003880000004},{std,0.022694313082794}]},
+ {8,[{mean,0.16316187040000002},{std,0.010083812151270955}]},
+ {16,[{mean,0.1028823829},{std,0.006246809549989811}]},
+ {32,[{mean,0.06624921680000001},{std,0.012216561426371333}]},
+ {64,[{mean,0.0425495496},{std,0.006864981151478264}]},
+ {128,[{mean,0.030518914},{std,0.003925533867756061}]},
+ {256,[{mean,0.0288563711},{std,0.001263944620042701}]}]
+```
+
+## (f) (10 points) Briefly explain the trends you observed in questions 1b, 1c, and 1e.
+
+We see a clear trend from 1b and 1e, that increasing the number of workers
+increases the performance greatly until you start going beyond the number of
+virtual cores in the machine. Computing primes and sum_inv_twin_primes are
+both embarrassingly parallel problems so it makes sense that they scale very well
+to all of the CPU cores on a machine. Beyond that, there's limited returns since
+they just start interfering with each other.
+
+When increasing N, it also makes sense that it's more efficient per N the larger
+it is. When N is small, and the number of workers is high, there's a lot of time
+spent in communication between the cores relative to the amount of work to be
+done.
+
+When N is very small, there's also likely some initial slowness caused by cold
+branch prediction and caches. That might account for the fact that when N=10 it
+is slower than when N=100.
+
 # Question 2
 
 ## (b) (4 points) Report the elapsed time for
