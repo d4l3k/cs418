@@ -7,13 +7,15 @@ Tristan Rice, q7w9a, 25886145
 ## (b) Measure the speedup...
 
 Sequential:
-```erl
+
+```erlang
 9> time_it:t(fun() -> hw3:primes(1000000) end, 10).
 [{mean,0.6915273465},{std,0.02324092802214097}]
 ```
 
 Parallel:
-```erl
+
+```erlang
 4> hw3:bench(fun(W) -> hw3:primes(W, 1000000, primes) end).
 [{4,[{mean,0.2155105605},{std,0.027648849586389867}]},
  {8,[{mean,0.1467121877},{std,0.020825639597937356}]},
@@ -29,7 +31,7 @@ sense with some small amount of overhead.
 
 ## (c)
 
-```erl
+```erlang
 5> hw3:bench_n(fun(W, N) -> hw3:primes(W, N, primes) end).
 [{10,[{mean,0.0010798956999999998},{std,8.645389528482865e-4}]},
  {100,[{mean,7.235081e-4},{std,3.771179012649232e-5}]},
@@ -44,13 +46,15 @@ sense with some small amount of overhead.
 Note: these benchmarks also include the time taken to generate the prime numbers.
 
 Sequential
-```erl
+
+```erlang
 4> time_it:t(fun() -> hw3:sum_inv_twin_primes(1000000) end, 10).
 [{mean,0.6929405766},{std,0.026442211991545932}]
 ```
 
 Parallel
-```erl
+
+```erlang
 5> hw3:bench(fun(W) -> hw3:primes(W, 1000000, primes), hw3:sum_inv_twin_primes(W, primes) end).
 [{4,[{mean,0.25865003880000004},{std,0.022694313082794}]},
  {8,[{mean,0.16316187040000002},{std,0.010083812151270955}]},
@@ -160,20 +164,25 @@ For k=1 nodes, the bandwidth is 5.
 For k=2 nodes, there are 6 top level switches, each with 10 connections. We have
 to cut half of those to bisect. Thus the width is 30.
 
-For k=3 nodes, there are still 6 top level switches, each with 10 connections.
-Thus there is still bandwidth of 30.
+For k=3 nodes, there are 36 top level switches, each with 10 connections.
+Thus the bandwidth is 180.
+
+For k=n nodes, we see that there are $5(6^{k-1})$.
 
 ## (c) How long does it take to send these messages?
 
 Each node on the left is sending 1KB to the opposite side. The total amount of
-data that needs to be transfered is $1KB(\frac{10^{k}}{2})$. Since there is a
-fixed bandwidth across the bisection, the amount of time will be
+data that needs to be transfered is $1KB(\frac{10^{k}}{2})$. Since each
+connection can send 1gbps, and the bisection width is the number of connected,
+we know the total bandwidth is $5(6^{k-1})$ gbps.
 
-$$\frac{1KB(\frac{10^{k}}{2})}{30 gb/s}$$
+$$\frac{1KB(\frac{10^{k}}{2})}{5(6^{k-1})gbps}$$
 
-$$=133.33ns(10^{k})$$
+$$=\frac{100B}{1gpbs}\frac{(10^{k})}{6^{k-1}}$$
 
-When $k=4$, it will take 1.3333 milliseconds.
+$$=800ns(\frac{10^{k}}{6^{k-1}})$$
+
+When $k=4$, it will take $37.04\mu s$.
 
 ## (d) What is the bisection width of a toroidal machine with $10^k$ nodes?
 
