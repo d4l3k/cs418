@@ -17,7 +17,18 @@ void _cudaTry(cudaError_t cudaStatus, const char *fileName, int lineNumber) {
 
 
 void f(float *x, float *xm, uint n, uint m) {
-  /* you need to write this */
+  int size = n*sizeof(float);
+  float *dev_x, *dev_xm;
+
+  cudaTry(cudaMalloc((void**)(&dev_x), size));
+  cudaTry(cudaMalloc((void**)(&dev_xm), size));
+  cudaTry(cudaMemcpy(dev_x, x, size, cudaMemcpyHostToDevice));
+
+  saxpy_kernel<<<ceil(n/256.0),256>>>(n, a, dev_x, dev_y);
+
+  cudaTry(cudaMemcpy(xm, dev_ size, cudaMemcpyDeviceToHost));
+  cudaTry(cudaFree(dev_x));
+  cudaTry(cudaFree(dev_xm));
 }
 
 void f_cpu(float *x, float *xm, uint n, uint m) {
@@ -52,7 +63,7 @@ __global__ void saxpy_kernel(uint n, float a, float *x, float *y) {
   uint i = blockIdx.x*blockDim.x + threadIdx.x; // nvcc built-ins
   if(i < n)
     y[i] = a*x[i] + y[i];
-  }
+}
 
 void saxpy(uint n, float a, float *x, float *y) {
   int size = n*sizeof(float);
@@ -64,14 +75,16 @@ void saxpy(uint n, float a, float *x, float *y) {
   cudaTry(cudaMemcpy(dev_y, y, size, cudaMemcpyHostToDevice));
 
   saxpy_kernel<<<ceil(n/256.0),256>>>(n, a, dev_x, dev_y);
-  
+
   cudaTry(cudaMemcpy(y, dev_y, size, cudaMemcpyDeviceToHost));
   cudaTry(cudaFree(dev_x));
   cudaTry(cudaFree(dev_y));
 }
 
 void saxpy_cpu(uint n, float a, float *x, float *y) {
-  /* you need to write this */
+  for (int i=0; i< n; i++) {
+    y[i] = a*x[i] + y[i];
+  }
 }
 
 void saxpy_test(uint n, float a, int gpu_flag) {
@@ -109,7 +122,7 @@ void f_main(int argc, char **argv, int gpu_flag) {
   m = strtoul(argv[3], NULL, 10);
   f_test(n, m, gpu_flag);
 }
-  
+
 // saxpy_main: for command lines of the form
 //   hw4 saxpy n [a]
 // or
@@ -127,7 +140,7 @@ void saxpy_main(int argc, char **argv, int gpu_flag) {
   else a = 3.0;
   saxpy_test(n, a, gpu_flag);
 }
-  
+
 int main(int argc, char **argv) {
   if(argc < 2) {
     fprintf(stderr, "usage: hw4 testName testArgs\n");
