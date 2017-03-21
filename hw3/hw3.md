@@ -99,21 +99,21 @@ random array n=1000000 n_trial=100 t_avg=7.868e-02
 ### ii. Sorting an array of 1,000,000 ascending elements.
 
 ```
-./hw3 ascending array 1000000 100
+$ ./hw3 ascending array 1000000 100
 ascending array n=1000000 n_trial=100 t_avg=2.112e-02
 ```
 
 ### iii. Sorting a list of 1,000,000 random elements.
 
 ```
-./hw3 random list 1000000 100
+$ ./hw3 random list 1000000 100
 random list n=1000000 n_trial=100 t_avg=2.174e-01
 ```
 
 ### iv. Sorting a list of 1,000,000 ascending elements.
 
 ```
-./hw3 ascending list 1000000 100
+$ ./hw3 ascending list 1000000 100
 ascending list n=1000000 n_trial=100 t_avg=8.000e-04
 ```
 
