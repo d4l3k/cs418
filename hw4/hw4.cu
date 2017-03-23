@@ -16,6 +16,18 @@ void _cudaTry(cudaError_t cudaStatus, const char *fileName, int lineNumber) {
 }
 
 
+__global__ void f_kernel(uint n, uint m, float *x, float *xm) {
+  uint i = blockIdx.x*blockDim.x + threadIdx.x; // nvcc built-ins
+  if(i < n) {
+    float a = 5.0/2.0;
+    float y = x[i];
+    for(uint j = 0; j < m; j++) {
+      y = a*(y*y*y - y);
+    }
+    xm[i] = y;
+  }
+}
+
 void f(float *x, float *xm, uint n, uint m) {
   int size = n*sizeof(float);
   float *dev_x, *dev_xm;
@@ -24,9 +36,9 @@ void f(float *x, float *xm, uint n, uint m) {
   cudaTry(cudaMalloc((void**)(&dev_xm), size));
   cudaTry(cudaMemcpy(dev_x, x, size, cudaMemcpyHostToDevice));
 
-  saxpy_kernel<<<ceil(n/256.0),256>>>(n, a, dev_x, dev_y);
+  f_kernel<<<ceil(n/256.0),256>>>(n, m, dev_x, dev_xm);
 
-  cudaTry(cudaMemcpy(xm, dev_ size, cudaMemcpyDeviceToHost));
+  cudaTry(cudaMemcpy(xm, dev_xm, size, cudaMemcpyDeviceToHost));
   cudaTry(cudaFree(dev_x));
   cudaTry(cudaFree(dev_xm));
 }
@@ -55,14 +67,21 @@ void f_test(uint n, uint m, int gpu_flag) {
   getrusage(RUSAGE_SELF, &r1);
   double t_elapsed =   (r1.ru_utime.tv_sec - r0.ru_utime.tv_sec)
                      + 1e-6*(r1.ru_utime.tv_usec - r0.ru_utime.tv_usec);
-  printf("f%s(n, ...): t_elapsed = %10.3e\n",
-         gpu_flag ? "" : "_cpu", t_elapsed);
+  printf("f%s(n, ...): t_elapsed = %10.3e, throughput = %10.3e\n",
+         gpu_flag ? "" : "_cpu", t_elapsed, n*m/t_elapsed);
 }
 
 __global__ void saxpy_kernel(uint n, float a, float *x, float *y) {
   uint i = blockIdx.x*blockDim.x + threadIdx.x; // nvcc built-ins
-  if(i < n)
-    y[i] = a*x[i] + y[i];
+  if(i < n) {
+    float yi = y[i];
+    float xi = x[i];
+    float out;
+    //for (int j=0; j<10; j++) {
+      out = a*xi + yi;
+    //}
+    y[i] = out;
+  }
 }
 
 void saxpy(uint n, float a, float *x, float *y) {
@@ -83,7 +102,13 @@ void saxpy(uint n, float a, float *x, float *y) {
 
 void saxpy_cpu(uint n, float a, float *x, float *y) {
   for (int i=0; i< n; i++) {
-    y[i] = a*x[i] + y[i];
+    float yi = y[i];
+    float xi = x[i];
+    float out;
+    //for (int j = 0; j<10; j++) {
+      out = a*xi + yi;
+    //}
+    y[i] = out;
   }
 }
 
