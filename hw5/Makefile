@@ -7,7 +7,7 @@ CU_SRC := hw5_conv.cu
 # Compilor and linker options
 
 #CXX=g++ -m64 -Wl,--trace
-CXX=g++ -m64 
+CXX=g++ -m64
 CXXFLAGS=-O3 -Wall -g -std=c++11
 
 INC_DIR= #-I/cs/local/lib/pkg/freeglut-3.0.0/include
@@ -40,3 +40,17 @@ $(BUILD_DIR)/%.o: %.cpp
 
 $(BUILD_DIR)/%.o: %.cu
 	$(NVCC) $< $(NVCCFLAGS) -c -o $@
+
+.PHONY: sync
+sync:
+	rsync -rav .. q7w9a@thetis.ugrad.cs.ubc.ca:~/cs418
+
+.PHONY: syncout
+syncout:
+	rsync -rav q7w9a@thetis.ugrad.cs.ubc.ca:~/cs418/hw5/out /tmp/
+
+CMD?=zsh -i
+
+.PHONY: shell
+shell: sync
+	ssh q7w9a@thetis.ugrad.cs.ubc.ca -C "ssh lin13.ugrad.cs.ubc.ca -C \"cd cs418/hw5 && zsh -ic \\\"$(CMD)\\\"\""

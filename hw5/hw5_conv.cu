@@ -18,6 +18,9 @@
 float *hos_stencil_1dx = NULL;
 float *hos_stencil_1dy = NULL;
 
+__constant__ float STENCIL_1DX[STENCIL_WIDTH_X];
+__constant__ float STENCIL_1DY[STENCIL_WIDTH_Y];
+
 ////////////////////////////////////////////////////////////////
 ///////////////////////// CUDA kernels /////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -34,13 +37,39 @@ __global__ void conv1h_basic_kernel(int width, int height,
   int y = blockDim.y * blockIdx.y + threadIdx.y;
   if((x < width) && (y < height)) {
     int image_offset = y * width + x;
-    dev_output[image_offset] = 1.0f - dev_input[image_offset];
+    int start = image_offset - (STENCIL_WIDTH_X/2);
+    float sum = 0;
+    for (int i=0; i < STENCIL_WIDTH_X; i++) {
+      int index = start+i;
+      int new_x = x + (index - image_offset);
+      if (new_x >= 0 && new_x < width) {
+	sum += STENCIL_1DX[i]*dev_input[index];
+      }
+    }
+    dev_output[image_offset] = sum;
   }
 }
 
 __global__ void conv1v_basic_kernel(int width, int height,
   float *dev_input, float *dev_output) {
-  // TODO: Complete this kernel.
+  // TODO: This is only an example kernel: it reverses the greyscale
+  // value of the input image but does not otherwise modify it.
+
+  int x = blockDim.x * blockIdx.x + threadIdx.x;
+  int y = blockDim.y * blockIdx.y + threadIdx.y;
+  if((x < width) && (y < height)) {
+    int y_offset = (STENCIL_WIDTH_Y/2);
+    float sum = 0;
+    int image_offset = y * width + x;
+    for (int i=0; i < STENCIL_WIDTH_Y; i++) {
+      int new_y = y_offset+i+y;
+      if (new_y >= 0 && new_y < height) {
+	int index = new_y * width + x;
+	sum += STENCIL_1DY[i]*dev_input[index];
+      }
+    }
+    dev_output[image_offset] = sum;
+  }
 }
 
 __global__ void conv1h_tiled_kernel(int width, int height,
@@ -82,6 +111,8 @@ void conv1h_basic(int width, int height, float *hos_data_in, float *hos_data_out
   // Allocate space on the device and copy over the input image.
   int image_size = width * height * sizeof(float);
 
+  cudaMemcpyToSymbol(STENCIL_1DX, hos_stencil_1dx, STENCIL_WIDTH_X * sizeof(float));
+
   cudaMalloc(&dev_image_in_buffer, image_size);
   cudaMalloc(&dev_image_out_buffer, image_size);
 
@@ -112,16 +143,48 @@ void conv1h_basic(int width, int height, float *hos_data_in, float *hos_data_out
 
 // Q2 (b)
 void conv1v_basic(int width, int height, float *hos_data_in, float *hos_data_out) {
-  // TO DO: Remove the following two lines and complete this host function.
-  fprintf(stderr, "conv1v_basic() not yet implemented\n");
-  exit(1);
+  float *dev_image_in_buffer;
+  float *dev_image_out_buffer;
+
+  // Allocate space on the device and copy over the input image.
+  int image_size = width * height * sizeof(float);
+
+  cudaMemcpyToSymbol(STENCIL_1DY, hos_stencil_1dy, STENCIL_WIDTH_Y * sizeof(float));
+
+  cudaMalloc(&dev_image_in_buffer, image_size);
+  cudaMalloc(&dev_image_out_buffer, image_size);
+
+  cudaMemcpy(dev_image_in_buffer, hos_data_in, image_size,
+	     cudaMemcpyHostToDevice);
+
+  // Compute grid and block size
+  dim3 blockDim(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1);
+  int grid_size_x = ceil((double) width / BLOCK_SIZE_X);
+  int grid_size_y = ceil((double) height / BLOCK_SIZE_Y);
+  printf("\ngrid_size (%d, %d)\n", grid_size_x, grid_size_y);
+  dim3 gridDim(grid_size_x, grid_size_y, 1);
+
+  // Launch kernel
+  conv1v_basic_kernel<<<gridDim, blockDim>>>(width, height,
+    dev_image_in_buffer, dev_image_out_buffer);
+
+  // Synchronization
+  cudaThreadSynchronize();
+
+  // Retrieve the output image and free the memory on the device.
+  cudaMemcpy(hos_data_out, dev_image_out_buffer, image_size,
+	     cudaMemcpyDeviceToHost);
+
+  cudaFree(dev_image_in_buffer);
+  cudaFree(dev_image_out_buffer);
 }
 
 // Q2 (c)
 void conv1to2_basic(int width, int height, float *hos_data_in, float *hos_data_out) {
-  // TO DO: Remove the following two lines and complete this host function.
-  fprintf(stderr, "conv1to2_basic() not yet implemented\n");
-  exit(1);
+  float * temp = (float*)malloc(width*height*sizeof(float));
+  conv1h_basic(width, height, hos_data_in, temp);
+  conv1v_basic(width, height, temp, hos_data_out);
+  free(temp);
 }
 
 // Q3 (a)
@@ -154,7 +217,7 @@ void conv1to2_tiled(int width, int height, float *hos_data_in, float *hos_data_o
 Convolution::~Convolution() {
   free(hos_stencil_1dx);
   free(hos_stencil_1dy);
-  
+
   hos_stencil_1dx = hos_stencil_1dy = NULL;
 }
 
@@ -239,7 +302,7 @@ void Convolution::run_vertical_1d() {
 
 void Convolution::run_1to2() {
   int width = hos_image_in.width, height = hos_image_in.height;
-  
+
   conv1to2_basic(width, height, hos_image_in.pixels, hos_image_out.pixels);
 }
 
