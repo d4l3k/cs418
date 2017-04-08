@@ -30,8 +30,8 @@ void verify(int width, int height, const float *pixels, int operation_num, std::
       int x = px_ind % width;
 
       std::ostringstream oss;
-      //oss << "<(" << x << ", " << height - 1 - y << "), " << px << " (" << pixels[px_ind] << ")" << "=/=" << ref_px << "(ref)" << ">";
-      oss << "<(" << x << ", " << height - 1 - y << "), " << pixels[px_ind] << ">";
+      oss << "<(" << x << ", " << height - 1 - y << "), " << (int)px << " (" << pixels[px_ind] << ")" << "=/=" << (int)ref_px << "(ref)" << ">";
+      //oss << "<(" << x << ", " << height - 1 - y << "), " << pixels[px_ind] << ">";
       error_messages.emplace_back(oss.str());
     }
   }
