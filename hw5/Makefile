@@ -41,6 +41,11 @@ $(BUILD_DIR)/%.o: %.cpp
 $(BUILD_DIR)/%.o: %.cu
 	$(NVCC) $< $(NVCCFLAGS) -c -o $@
 
+
+hw5_blas: hw5_blas.cu
+	nvcc -lcublas hw5_blas.cu -o hw5_blas
+
+
 .PHONY: sync
 sync:
 	rsync -rav .. q7w9a@thetis.ugrad.cs.ubc.ca:~/cs418

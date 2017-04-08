@@ -7,8 +7,8 @@
 // Size of the blocks on the GPU.  This is the smallest possible
 // square block size that is an integer multiple of a warp.  You may
 // modify these values if you want.
-#define BLOCK_SIZE_X 8
-#define BLOCK_SIZE_Y 8
+#define BLOCK_SIZE_X 128
+#define BLOCK_SIZE_Y 128
 
 // Size of the stencils.  Do not modify.
 #define STENCIL_WIDTH_X 21
@@ -84,7 +84,7 @@ __global__ void conv1h_tiled_kernel(int width, int height, float *dev_input,
   int n = STENCIL_WIDTH_X / 2;
 
   int dimx = blockDim.x;
-  int halo_offsets[4] = {dimx, 2*dimx, -dimx, -2*dimx};
+  int halo_offsets[4] = {dimx, -dimx}; //, 2*dimx, -2*dimx};
 
   for (int j = 0; j < 4; j++) {
     int new_x = x + halo_offsets[j];
